@@ -8,6 +8,7 @@ import (
 )
 
 type DidVerificationMethod struct {
+	Context      []string `json:"@context,omitempty"`
 	Id           string  `json:"id"`
 	Controller   string  `json:"controller"`
 	Type         string  `json:"type"`
@@ -15,6 +16,7 @@ type DidVerificationMethod struct {
 }
 
 type DidDocument struct {
+	Context      	   []string `json:"@context,omitempty"`
 	Id                 string                  `json:"id"`
 	Controller         string                  `json:"controller"`
 	VerificationMethod []DidVerificationMethod `json:"verificationMethod"`
