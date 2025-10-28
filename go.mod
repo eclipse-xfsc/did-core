@@ -1,4 +1,4 @@
-module github.com/eclipse-xfsc/did-core
+module github.com/eclipse-xfsc/did-core/v2
 
 go 1.24.0
 

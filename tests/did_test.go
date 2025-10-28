@@ -3,7 +3,7 @@ package tests
 import (
 	"testing"
 
-	"github.com/eclipse-xfsc/did-core"
+	"github.com/eclipse-xfsc/did-core/v2"
 	"github.com/spf13/viper"
 )
 

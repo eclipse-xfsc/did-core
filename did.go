@@ -10,7 +10,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/eclipse-xfsc/did-core/types"
+	"github.com/eclipse-xfsc/did-core/v2/types"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
