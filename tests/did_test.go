@@ -15,7 +15,9 @@ const didJSON = `{
   ],
   "id": "did:example:123456789abcdefghi",
   
-  "verificationMethod": [{
+  "verificationMethod": [
+	"did:bla:bla",
+    {
     "id": "did:example:123#_Qq0UL2Fq651Q0Fjd6TvnYE-faHiOpRlPVQcY_-tA4A",
     "type": "JsonWebKey2020", 
     "controller": "did:example:123",
@@ -45,7 +47,11 @@ func TestDidDocumentParsing(t *testing.T) {
 		t.Error(err)
 	}
 
-	if didDoc.VerificationMethod[0].PublicKeyJwk == nil {
+	if didDoc.VerificationMethod[0].Reference == nil {
+		t.Error()
+	}
+
+	if didDoc.VerificationMethod[1].Key.PublicKeyJwk == nil {
 		t.Error()
 	}
 }

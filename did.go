@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/eclipse-xfsc/did-core/types"
-	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -27,38 +26,19 @@ func Initialize() {
 	did_resolver = viper.GetString("DID_RESOLVER")
 }
 
-type didVerificationMethod struct {
-	Id           string      `json:"id"`
-	Controller   string      `json:"controller"`
-	Type         string      `json:"type"`
-	PublicKeyJwk interface{} `json:"publicKeyJwk,omitempty"`
-}
-
-type didDocument struct {
-	Id                 string                  `json:"id"`
-	Controller         string                  `json:"controller"`
-	VerificationMethod []didVerificationMethod `json:"verificationMethod"`
-}
-
 type didResolution struct {
 	Document interface{} `json:"didDocument"`
 }
 
 func ParseDidDocument(didJson string) (*types.DidDocument, error) {
-	var didDoc didDocument
+	var didDoc types.DidDocument
 	err := json.Unmarshal([]byte(didJson), &didDoc)
 
 	if err != nil {
 		return nil, err
 	}
 
-	doc, err := didDoc.transformParsing()
-
-	if err != nil {
-		return nil, err
-	}
-
-	return doc, nil
+	return &didDoc, nil
 }
 
 func ToDidWeb(rawURL string, dockerAware bool) (string, error) {
@@ -91,33 +71,6 @@ func ToDidWeb(rawURL string, dockerAware bool) (string, error) {
 
 	didWeb := fmt.Sprintf("did:web:%s", didSafeHost)
 	return didWeb, nil
-}
-
-func (d *didDocument) transformParsing() (*types.DidDocument, error) {
-
-	var newDoc types.DidDocument
-	newDoc.Id = d.Id
-	newDoc.Controller = d.Controller
-	newDoc.VerificationMethod = make([]types.DidVerificationMethod, 0)
-	for _, method := range d.VerificationMethod {
-		json, err := json.Marshal(method.PublicKeyJwk)
-		if err != nil {
-			return nil, err
-		}
-		key, err := jwk.ParseKey(json)
-		if err != nil {
-			return nil, err
-		}
-		newMethod := types.DidVerificationMethod{
-			Id:           method.Id,
-			Type:         method.Type,
-			Controller:   method.Controller,
-			PublicKeyJwk: key,
-		}
-		newDoc.VerificationMethod = append(newDoc.VerificationMethod, newMethod)
-	}
-	return &newDoc, nil
-
 }
 
 func extractHttpBody(reader io.ReadCloser) string {
