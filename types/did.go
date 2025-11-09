@@ -80,9 +80,9 @@ func (v VerificationRelationShipEntry) MarshalJSON() ([]byte, error) {
 }
 
 type DidDocument struct {
-	Context    []string `json:"@context,omitempty"`
-	Id         string   `json:"id"`
-	Controller string   `json:"controller,omitempty"`
+	Context    ContextValue `json:"@context,omitempty"`
+	Id         string       `json:"id"`
+	Controller string       `json:"controller,omitempty"`
 
 	VerificationMethod   []VerificationRelationShipEntry `json:"verificationMethod,omitempty"`
 	Authentication       []VerificationRelationShipEntry `json:"authentication,omitempty"`
@@ -117,4 +117,49 @@ func (d *DidDocument) GetPublicKeys() jwk.Set {
 	}
 
 	return keys
+}
+
+type ContextValue []interface{}
+
+func (c *ContextValue) UnmarshalJSON(data []byte) error {
+	// Variante 1: einzelner String
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		*c = ContextValue{s}
+		return nil
+	}
+
+	// Variante 2: Array (Strings und/oder Objekte)
+	var arr []interface{}
+	if err := json.Unmarshal(data, &arr); err == nil {
+		*c = ContextValue(arr)
+		return nil
+	}
+
+	return fmt.Errorf("invalid @context format: %s", string(data))
+}
+
+func (c ContextValue) MarshalJSON() ([]byte, error) {
+	// Wenn nur ein Eintrag und der ist ein String -> als einfacher String ausgeben
+	if len(c) == 1 {
+		if s, ok := c[0].(string); ok {
+			return json.Marshal(s)
+		}
+	}
+	// sonst ganz normal als Array
+	return json.Marshal([]interface{}(c))
+}
+
+func (c ContextValue) Iterate(fn func(i int, s string, m map[string]interface{}, okString, okMap bool)) {
+	for i, v := range c {
+		switch val := v.(type) {
+		case string:
+			fn(i, val, nil, true, false)
+		case map[string]interface{}:
+			fn(i, "", val, false, true)
+		default:
+			// Unbekannter Typ – ignorieren oder separat behandeln
+			fn(i, "", nil, false, false)
+		}
+	}
 }
