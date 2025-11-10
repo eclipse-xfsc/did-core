@@ -2,6 +2,7 @@ package did
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/eclipse-xfsc/did-core/v2/types"
+	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -82,12 +84,7 @@ func extractHttpBody(reader io.ReadCloser) string {
 	return bodyString
 }
 
-func Resolve(did string) (*types.DidDocument, error) {
-	Initialize()
-	if did == "" {
-		return nil, errors.New("DID cannot be empty")
-	}
-
+func resolveWithResolver(did string) ([]byte, error) {
 	req, err := http.NewRequest("GET", did_resolver+"/1.0/identifiers/"+did, nil)
 	if err != nil {
 		return nil, err
@@ -119,12 +116,95 @@ func Resolve(did string) (*types.DidDocument, error) {
 		return nil, err
 	}
 
-	d, err := ParseDidDocument(string(s))
+	return s, nil
+}
+
+func resolveDidJwk(did string) (*types.DidDocument, error) {
+	const prefix = "did:jwk:"
+	if !strings.HasPrefix(did, prefix) {
+		return nil, fmt.Errorf("not a did:jwk identifier: %s", did)
+	}
+
+	encoded := strings.TrimPrefix(did, prefix)
+
+	// Base64URL-dekodieren (kein Padding!)
+	data, err := base64.RawURLEncoding.DecodeString(encoded)
+	if err != nil {
+		return nil, fmt.Errorf("failed to base64url-decode JWK: %w", err)
+	}
+
+	keyset, err := jwk.Parse(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse JWK: %w", err)
+	}
+
+	if keyset.Len() == 0 {
+		return nil, errors.New("no keys found in JWK")
+	}
+
+	key, ok := keyset.Key(0)
+	if !ok {
+		return nil, errors.New("could not extract key from set")
+	}
+
+	vmID := did + "#0"
+	doc := &types.DidDocument{
+		Context: types.ContextValue{
+			"https://www.w3.org/ns/did/v1",
+			"https://w3id.org/security/suites/jws-2020/v1",
+		},
+		Id: did,
+		VerificationMethod: []types.VerificationRelationShipEntry{
+			types.VerificationRelationShipEntry{
+				Key: &types.VerificationMethod{
+					Id:           vmID,
+					Type:         "JsonWebKey2020",
+					Controller:   did,
+					PublicKeyJwk: key,
+				},
+			},
+		},
+		Authentication: []types.VerificationRelationShipEntry{
+			types.VerificationRelationShipEntry{
+				Reference: &vmID,
+			},
+		},
+		AssertionMethod: []types.VerificationRelationShipEntry{
+			types.VerificationRelationShipEntry{
+				Reference: &vmID,
+			},
+		},
+		CapabilityInvocation: []types.VerificationRelationShipEntry{
+			types.VerificationRelationShipEntry{
+				Reference: &vmID,
+			},
+		},
+	}
+
+	return doc, nil
+}
+
+func Resolve(did string) (*types.DidDocument, error) {
+	Initialize()
+
+	if did == "" {
+		return nil, errors.New("DID cannot be empty")
+	}
+
+	var doc []byte
+	var err error
+	//TODO did key
+	if strings.HasPrefix(did, "did:jwk") {
+		return resolveDidJwk(did)
+	} else {
+		doc, err = resolveWithResolver(did)
+	}
+
+	d, err := ParseDidDocument(string(doc))
 
 	if err != nil {
 		return nil, err
 	}
 
 	return d, nil
-
 }

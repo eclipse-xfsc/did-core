@@ -1,10 +1,12 @@
 package tests
 
 import (
+	"encoding/base64"
 	"testing"
 
 	"github.com/eclipse-xfsc/did-core/v2"
 	"github.com/spf13/viper"
+	"github.com/stretchr/testify/require"
 )
 
 const didJson2 = `{
@@ -154,4 +156,42 @@ func TestDidResolver(t *testing.T) {
 	if d.VerificationMethod != nil && len(d.VerificationMethod) == 0 {
 		t.Error()
 	}
+}
+
+var exampleJwk = `{
+	"kty": "OKP",
+	"crv": "Ed25519",
+	"x": "VCpo2LMLhn6iWku8MKvSLg2ZAoC-nlOyPVQaO3FxVeQ"
+  }`
+
+// Hilfsfunktion: encodiert JWK → did:jwk
+func makeDidJwk(jwkJSON string) string {
+	encoded := base64.RawURLEncoding.EncodeToString([]byte(jwkJSON))
+	return "did:jwk:" + encoded
+}
+
+func TestResolveDidJwk(t *testing.T) {
+	didJwk := makeDidJwk(exampleJwk)
+
+	doc, err := did.Resolve(didJwk)
+	require.NoError(t, err, "Resolver should not error on valid did:jwk")
+	require.NotNil(t, doc, "DID Document should not be nil")
+
+	// ID sollte korrekt gesetzt sein
+	require.Equal(t, didJwk, doc.Id)
+
+	// VerificationMethod sollte existieren
+	require.Len(t, doc.VerificationMethod, 1)
+	vm := doc.VerificationMethod[0]
+
+	require.Equal(t, "JsonWebKey2020", vm.Key.Type)
+	require.Equal(t, doc.Id, vm.Key.Controller)
+
+	// publicKeyJwk sollte ein valides JSON sein
+	// var parsed map[string]any
+	// err = json.Unmarshal(vm.Key.PublicKeyJwk, &parsed)
+	// require.NoError(t, err)
+	// require.Equal(t, "OKP", parsed["kty"])
+	// require.Equal(t, "Ed25519", parsed["crv"])
+	// require.Equal(t, "VCpo2LMLhn6iWku8MKvSLg2ZAoC-nlOyPVQaO3FxVeQ", parsed["x"])
 }
