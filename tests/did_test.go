@@ -1,12 +1,15 @@
 package tests
 
 import (
+	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/json"
 	"testing"
 
 	"github.com/eclipse-xfsc/did-core/v2"
 	"github.com/eclipse-xfsc/did-core/v2/types"
+	"github.com/lestrrat-go/jwx/v2/jwk"
+	"github.com/mr-tron/base58"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 )
@@ -66,6 +69,106 @@ const didJSON = `{
     }
   }]
   }`
+
+func TestDidDocumentPublicKeyBase58(t *testing.T) {
+	data := []byte(`{
+		"@context": [
+			"https://www.w3.org/ns/did/v1"
+		],
+		"id": "did:example:123",
+		"verificationMethod": [
+			{
+				"id": "did:example:123#key-1",
+				"type": "Ed25519VerificationKey2018",
+				"controller": "did:example:123",
+				"publicKeyBase58": "Fsk7PRnVDC9HxpjPuoVQBzpuYX7HiiNCm5YPDJVfurTh"
+			}
+		],
+		"authentication": [
+			"did:example:123#key-1"
+		]
+	}`)
+
+	var document types.DidDocument
+
+	err := json.Unmarshal(data, &document)
+	require.NoError(t, err)
+
+	require.Equal(t, "did:example:123", document.Id)
+	require.Len(t, document.VerificationMethod, 1)
+	require.Len(t, document.Authentication, 1)
+
+	entry := document.VerificationMethod[0]
+
+	require.NotNil(t, entry.Key)
+	require.Nil(t, entry.Reference)
+
+	method := entry.Key
+
+	require.Equal(t, "did:example:123#key-1", method.Id)
+	require.Equal(t, "Ed25519VerificationKey2018", method.Type)
+	require.Equal(t, "did:example:123", method.Controller)
+	require.Equal(
+		t,
+		"Fsk7PRnVDC9HxpjPuoVQBzpuYX7HiiNCm5YPDJVfurTh",
+		method.PublicKeyBase58,
+	)
+	require.Nil(t, method.PublicKeyJwk)
+
+	require.Nil(t, document.Authentication[0].Key)
+	require.NotNil(t, document.Authentication[0].Reference)
+	require.Equal(
+		t,
+		"did:example:123#key-1",
+		*document.Authentication[0].Reference,
+	)
+
+	keys := document.GetPublicKeys()
+
+	require.Equal(t, 1, keys.Len())
+
+	key, ok := keys.LookupKeyID("did:example:123#key-1")
+	require.True(t, ok)
+	require.NotNil(t, key)
+
+	require.Equal(t, "did:example:123#key-1", key.KeyID())
+
+	var publicKey ed25519.PublicKey
+
+	err = key.Raw(&publicKey)
+	require.NoError(t, err)
+
+	require.Len(t, publicKey, ed25519.PublicKeySize)
+
+	expectedBytes, err := base58.Decode(
+		"Fsk7PRnVDC9HxpjPuoVQBzpuYX7HiiNCm5YPDJVfurTh",
+	)
+	require.NoError(t, err)
+
+	require.Equal(t, expectedBytes, []byte(publicKey))
+
+	publicJWK, err := json.Marshal(key)
+	require.NoError(t, err)
+
+	var parsedJWK map[string]any
+
+	err = json.Unmarshal(publicJWK, &parsedJWK)
+	require.NoError(t, err)
+
+	require.Equal(t, "OKP", parsedJWK["kty"])
+	require.Equal(t, "Ed25519", parsedJWK["crv"])
+	require.Equal(
+		t,
+		"did:example:123#key-1",
+		parsedJWK["kid"],
+	)
+
+	require.NotEmpty(t, parsedJWK["x"])
+	require.NotContains(t, parsedJWK, "d")
+
+	_, err = jwk.ParseKey(publicJWK)
+	require.NoError(t, err)
+}
 
 func TestDidDocumentParsing(t *testing.T) {
 	didDoc, err := did.ParseDidDocument(didJSON)
