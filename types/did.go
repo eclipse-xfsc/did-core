@@ -82,7 +82,7 @@ func (v VerificationRelationShipEntry) MarshalJSON() ([]byte, error) {
 type DidDocument struct {
 	Context    ContextValue `json:"@context,omitempty"`
 	Id         string       `json:"id"`
-	Controller string       `json:"controller,omitempty"`
+	Controller any          `json:"controller,omitempty"`
 
 	VerificationMethod   []VerificationRelationShipEntry `json:"verificationMethod,omitempty"`
 	Authentication       []VerificationRelationShipEntry `json:"authentication,omitempty"`

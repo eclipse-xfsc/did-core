@@ -2,9 +2,11 @@ package tests
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"testing"
 
 	"github.com/eclipse-xfsc/did-core/v2"
+	"github.com/eclipse-xfsc/did-core/v2/types"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 )
@@ -168,6 +170,31 @@ var exampleJwk = `{
 func makeDidJwk(jwkJSON string) string {
 	encoded := base64.RawURLEncoding.EncodeToString([]byte(jwkJSON))
 	return "did:jwk:" + encoded
+}
+
+func TestDidDocumentMultipleControllers(t *testing.T) {
+	data := []byte(`{
+        "@context": ["https://www.w3.org/ns/did/v1"],
+        "id": "did:example:123",
+        "controller": [
+            "did:example:controller1",
+            "did:example:controller2"
+        ]
+    }`)
+
+	var document types.DidDocument
+
+	err := json.Unmarshal(data, &document)
+	require.NoError(t, err)
+
+	require.Equal(t, "did:example:123", document.Id)
+
+	controllers, ok := document.Controller.([]any)
+	require.True(t, ok)
+
+	require.Len(t, controllers, 2)
+	require.Equal(t, "did:example:controller1", controllers[0])
+	require.Equal(t, "did:example:controller2", controllers[1])
 }
 
 func TestResolveDidJwk(t *testing.T) {
